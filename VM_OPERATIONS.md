@@ -8,7 +8,10 @@
 ## SSH into VM
 
 ```bash
-ssh -i /Users/raveen/Desktop/choreocertmgt.pem azureuser@20.75.77.58
+VM_IP="20.75.77.58"
+SSH_KEY="/Users/raveen/Desktop/choreocertmgt.pem"
+
+ssh -i "$SSH_KEY" azureuser@"$VM_IP"
 ```
 
 ---
@@ -45,17 +48,21 @@ tail -50 ~/tls-server/server.log
 
 ### Test from laptop
 ```bash
+# Set these once in your terminal session (from the repo root)
+VM_IP="20.75.77.58"
+TLS_CERTS="$(pwd)/generated-certs/tls"
+
 # Quick test (skips cert verification)
-curl -k https://20.75.77.58/health
+curl -k https://"$VM_IP"/health
 
 # Proper test (verifies server cert)
-curl --cacert /Users/raveen/Desktop/sample-go-app/server.pem https://20.75.77.58/health
+curl --cacert "$TLS_CERTS/server.pem" https://"$VM_IP"/health
 
 # Echo endpoint — inspect headers and TLS details
-curl -k https://20.75.77.58/echo
+curl -k https://"$VM_IP"/echo
 
 # Root endpoint
-curl -k https://20.75.77.58/
+curl -k https://"$VM_IP"/
 ```
 
 ---
@@ -97,10 +104,33 @@ tail -50 ~/tls-server/mtls_server.log
 
 ### Test from laptop (mTLS — requires client cert)
 ```bash
-curl --cacert /Users/raveen/Desktop/sample-go-app/server.pem \
-     --cert /Users/raveen/Desktop/sample-go-app/laptop_client.crt \
-     --key /Users/raveen/Desktop/sample-go-app/laptop_client.key \
-     https://20.75.77.58/echo
+# Set these once in your terminal session (from the repo root)
+VM_IP="20.75.77.58"
+TLS_CERTS="$(pwd)/generated-certs/tls"
+MTLS_CERTS="$(pwd)/generated-certs/mtls"
+
+# Health check
+curl --cacert "$TLS_CERTS/server.pem" \
+     --cert "$MTLS_CERTS/laptop_client.crt" \
+     --key "$MTLS_CERTS/laptop_client.key" \
+     https://"$VM_IP"/health
+
+# Echo endpoint — inspect headers, TLS details, and client_cert block
+curl --cacert "$TLS_CERTS/server.pem" \
+     --cert "$MTLS_CERTS/laptop_client.crt" \
+     --key "$MTLS_CERTS/laptop_client.key" \
+     https://"$VM_IP"/echo
+
+# Root endpoint
+curl --cacert "$TLS_CERTS/server.pem" \
+     --cert "$MTLS_CERTS/laptop_client.crt" \
+     --key "$MTLS_CERTS/laptop_client.key" \
+     https://"$VM_IP"/
+
+# Skip cert verification (quick sanity check only)
+curl -k --cert "$MTLS_CERTS/laptop_client.crt" \
+        --key "$MTLS_CERTS/laptop_client.key" \
+        https://"$VM_IP"/health
 ```
 
 ---
@@ -121,13 +151,29 @@ curl --cacert /Users/raveen/Desktop/sample-go-app/server.pem \
 
 ---
 
-## Certs on Local Machine
+## Certs on Local Machine (`generated-certs/`)
+
+### `generated-certs/tls/` — Server certificates (one-way TLS)
 
 | File | Description |
 |---|---|
-| `server.pem` | Server public cert — upload to Choreo as endpoint certificate |
-| `laptop_client.crt` | Laptop client cert — used with curl for mTLS testing |
-| `laptop_client.key` | Laptop client private key — used with curl for mTLS testing |
+| `tls/server.crt` | Server public certificate (used by the server at runtime) |
+| `tls/server.key` | Server private key |
+| `tls/server.pem` | Server public cert in PEM format — upload to Choreo as endpoint certificate |
+
+### `generated-certs/mtls/` — Client certificates (mTLS)
+
+| File | Description |
+|---|---|
+| `mtls/laptop_client.crt` | Laptop client cert — used with curl for mTLS testing |
+| `mtls/laptop_client.key` | Laptop client private key — used with curl for mTLS testing |
+
+### `generated-certs/generate_certs.sh`
+Regenerates the server cert. Run from the `generated-certs/` folder:
+```bash
+cd generated-certs
+./generate_certs.sh <VM_IP>
+```
 
 ---
 
