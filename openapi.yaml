@@ -1,0 +1,147 @@
+openapi: 3.0.3
+info:
+  title: TLS Test Server
+  description: >
+    A simple HTTPS test server running on an Azure VM (20.75.77.58) used to verify
+    TLS endpoint certificate configuration in WSO2 Choreo proxy components.
+  version: 1.0.0
+
+servers:
+  - url: https://20.75.77.58
+    description: Azure VM (TLS test server)
+
+paths:
+  /:
+    get:
+      operationId: getRoot
+      summary: Root endpoint
+      description: Returns a plain text message confirming the server is running.
+      responses:
+        "200":
+          description: Server is running
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "TLS Test Server is running.\nUse /health or /echo for testing.\n"
+
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check
+      description: Returns server status and current UTC timestamp. Use this to confirm basic TLS connectivity.
+      responses:
+        "200":
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+                time: "2024-03-03T08:00:00Z"
+
+  /echo:
+    get:
+      operationId: echoGet
+      summary: Echo request details (GET)
+      description: >
+        Reflects back all request metadata including headers, TLS handshake info,
+        and remote address. Use this to inspect what the Choreo proxy adds, strips,
+        or mutates in the request before it reaches the backend.
+      responses:
+        "200":
+          description: Echoed request details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EchoResponse"
+    post:
+      operationId: echoPost
+      summary: Echo request details (POST)
+      description: Same as GET /echo but accepts a request body. Useful for testing how Choreo handles POST requests.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Echoed request details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EchoResponse"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        time:
+          type: string
+          format: date-time
+          example: "2024-03-03T08:00:00Z"
+      required:
+        - status
+        - time
+
+    TLSInfo:
+      type: object
+      description: TLS handshake details from the established connection.
+      properties:
+        version:
+          type: string
+          example: "TLS 1.3"
+        cipher_suite:
+          type: string
+          example: "TLS_AES_128_GCM_SHA256"
+        server_name:
+          type: string
+          description: SNI value sent by the client (empty when connecting by IP)
+          example: ""
+        negotiated_protocol:
+          type: string
+          description: ALPN protocol negotiated (e.g. h2, http/1.1)
+          example: "h2"
+
+    EchoResponse:
+      type: object
+      properties:
+        method:
+          type: string
+          example: GET
+        url:
+          type: string
+          example: "/echo"
+        remote_addr:
+          type: string
+          description: IP and port of the connecting client (will be the Choreo proxy IP)
+          example: "20.10.5.1:54321"
+        headers:
+          type: object
+          description: All HTTP headers received by the server, keyed by header name.
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example:
+            X-Forwarded-For: ["203.0.113.5"]
+            User-Agent: ["Go-http-client/2.0"]
+        tls:
+          $ref: "#/components/schemas/TLSInfo"
+        time:
+          type: string
+          format: date-time
+          example: "2024-03-03T08:00:00Z"
+      required:
+        - method
+        - url
+        - remote_addr
+        - headers
+        - tls
+        - time
